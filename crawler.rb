@@ -9,16 +9,16 @@ class Crawler
 		$searched = Hash.new
 		$downloaded = Hash.new
 		$toSearch = Array.new
-		$curURL = startURL
-		#TODO: grab blacklist and whitelist from database
-		$extBlacklist=Array.new
-		$extBlacklist.push('.css','.js', '.ico', '.rss', '.php', '.exe', '.swf', '.html', '.htm1', '.pdf')
-		#$extWhitelist.push('.jpg', '.png', '.gif', '.webm')
+		#TODO: load searched, downloaded, and toSearch from databases if they exist
+		@curURL = url_protocol_smart_add(startURL)
+		#TODO: grab blacklist and whitelist from a database or text file
+		$extBlacklist=['.css','.js', '.ico', '.rss', '.php', '.exe', '.swf', '.html', '.shtm1', '.pdf']
+		$extWhitelist=['.jpg', '.png', '.gif', '.webm']
 		
 		$saveDir = 'downloads/'
-		Dir.mkdir($saveDur) unless Dir.exist?($saveDir)
+		Dir.mkdir($saveDir) unless Dir.exist?($saveDir)
 		$logDir = 'logs/'
-		Dir.mkdir($logDur) unless Dir.exist?($logDir)
+		Dir.mkdir($logDir) unless Dir.exist?($logDir)
 	end
 	
 	def nothingToSearch?
@@ -26,12 +26,17 @@ class Crawler
 	end
 	
 	def autoSearch
-		$curURL = nil	
-	end
-	
-	MEGABYTE = 1024.0 * 1024.0
-	def bytesToMeg(bytes)
-		bytes/MEGABYTE  
+		if (url_search(@curURL))
+			HashOfArray_smart_add($searched, @curURL)
+		end
+		$toSearch.shift
+		
+		if ($toSearch.empty?)
+			return false
+		else
+			@curURL = $toSearch[0]
+			return true
+		end
 	end
 
 	def get_response_with_redirect(uri)
@@ -41,26 +46,7 @@ class Crawler
 		end
 		r
 	end
-
-	def uri?(string)
-		uri = URI.parse(string)
-		%w( http https ).include?(uri.scheme)
-		rescue URI::BadURIError
-		false
-	rescue URI::InvalidURIError
-		false
-	end
-
-	def working_url?(url_str)
-		url = URI.parse(url_str)
-		Net::HTTP.start(url.host, url.port) do |http|
-			http.head(url.request_uri).code == '200'
-		end
-		return true
-	rescue
-		false
-	end
-
+	
 	def url_search(curURL)
 		response = get_response_with_redirect(URI.parse(curURL))
 		#check each line
@@ -78,12 +64,13 @@ class Crawler
 		end
 		return true
 	rescue => e
-		File.open($logDur+'main.txt', 'a') do |file|
+		#TODO: move code to an error handler
+		File.open($logDir+'main.txt', 'a') do |file|
 			file.puts "---------------------------------------------------------------------------"
 			file.puts curURL
 			file.puts e
 		end  
-		puts "\nEXCEPTION SAVED"
+		puts "\nEXCEPTION SAVED #{$logDir}main.txt"
 		return false
 	end
 
@@ -95,13 +82,12 @@ class Crawler
 		ext = File.extname(URI.parse(url).path)
 		if (ext != "")
 			if (!url_handled?($downloaded, url))
-				url_safeAdd_Hash($downloaded, url)
+				HashOfArray_smart_add($downloaded, url)
 				#if (!$extBlacklist.include?(ext))
 				if ($extWhitelist.include?(ext))
 					url.match(/([^\/]*)\.[a-z]+$/)
-
+					
 					#get file size
-					#TODO find a more efficient way to do this
 					$file_size
 					url_base = url.split('/')[2]
 					url_path = '/'+url.split('/')[3..-1].join('/')
@@ -109,11 +95,13 @@ class Crawler
 						response = http.request_head(url_path)
 						$file_size = response['content-length'].to_i
 					end
-					$mbTotal = $mbTotal + $file_size
-					print "\rdl #{$1}#{ext} >> #{bytesToMeg($file_size).round(3)}MB                            "
+					#$mbTotal = $mbTotal + $file_size
+					print "\rDownloading: #{url} >> #{bytesToMeg($file_size).round(3)}MB                                                                                     "
+					#print "\rDownloading #{@curURL}/#{$1}#{ext} >> #{bytesToMeg($file_size).round(3)}MB                                                                                     "
 					STDOUT.flush
+	
 					#download file
-					open($saveDur+$1+ext, 'wb') do |file|
+					open($saveDir+$1+ext, 'wb') do |file|
 						file<<open(url).read
 					end
 					$dlCount = $dlCount+1 
@@ -127,17 +115,17 @@ class Crawler
 		end
 		return true
 	rescue => e
-		File.open($logDur+'down.txt', 'a') do |file|
+		#TODO: move code to an error handler
+		File.open($logDir+'down.txt', 'a') do |file|
 			file.puts "---------------------------------------------------------------------------"
 			file.puts url
 			file.puts e
 		end  
-		puts "\nEXCEPTION SAVED"
+		puts "\nEXCEPTION SAVED #{$logDir}down.txt"
 		return false
 	end
 
-	#TODO: keep is array organized
-	def url_safeAdd_Hash(hash, url)
+	def HashOfArray_smart_add(hash, url)
 		offset = url.index('.')
 		key = url[offset]
 		if (!hash.has_key?(key))
@@ -152,5 +140,16 @@ class Crawler
 		offset = url.index('.')
 		key = url[offset]
 		return(hash.has_key?(key) && hash[key].include?(url))
+	end
+	
+	def url_protocol_smart_add(url)
+		unless url[/\Ahttp:\/\//] || url[/\Ahttps:\/\//]
+			url = "http://#{url}"
+		end
+	end
+	
+	MEGABYTE = 1024.0 * 1024.0
+	def bytesToMeg(bytes)
+		bytes/MEGABYTE  
 	end
  end

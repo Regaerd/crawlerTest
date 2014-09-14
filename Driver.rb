@@ -1,38 +1,39 @@
-require 'sdbm'			#provides databases
+#require 'sdbm'			#provides databases
 require 'io/console'	#provides STDIN.getch
-
 require './crawler'
 
-#input queue
-$iQUEUE = Array.new
+#for stopping program
+$inputArray = Array.new
 
 print "Starting address: "
-crawler = Crawler.new(gets)
-haltWords = /exit|stop|kill|x|q|quit|end/i
-
-#mainThread = Thread.new{sleep}
-#stopThread = Thread.new{sleep}
+crawler = Crawler.new(gets.chomp)
+haltWords = /exit|stop|kill|x|q|quit|end/i	#TODO: get halt words from a text file
 
 $killMainThread = false
 mainThread = Thread.new do
-	puts 'Starting main loop'
 	loop do
-		puts "\nSearching: #{crawler.curURL}]"
+		print "\rSearching: #{crawler.curURL}                                                                                                                           "
+		STDOUT.flush
 		crawler.autoSearch
 		break if ((crawler.nothingToSearch?)||($killMainThread))
 	end
-	puts "\n\nStopping main loop"
+	#TODO: store searched and toSearch addresses in databases
+	puts "\nStopping main loop, press any key to exit"
+	mainThread.exit
 end
 
 stopThread = Thread.new do
 	loop do
-		$iQUEUE << STDIN.getch
-		if ($iQUEUE.join =~ haltWords)
-			$killMainThread = true
-			puts "\n==========Shutting down ASAP==================="
+		$inputArray << STDIN.getch
+		if ($killMainThread)&&($inputArray.join =~ /kill/i)
+			mainThread.exit
 			stopThread.exit
-		elsif (!mainThread.alive?)
-			puts "\n==========Shutting down: no more work=========="
+		elsif ($inputArray.join =~ haltWords)
+				$killMainThread = true
+				$inputArray.clear
+				puts "\nShutting down safely (type 'kill' to force shutdown)"
+		end
+		if (!mainThread.alive?)
 			stopThread.exit
 		end
 	end
@@ -40,4 +41,3 @@ end
 
 mainThread.join
 stopThread.join
-puts "Closing"
