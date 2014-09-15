@@ -1,6 +1,7 @@
 require "net/http"
 require "uri"
 require 'open-uri'
+require './lib/handleError'
 
 class Crawler
 	attr_reader :curURL
@@ -11,14 +12,23 @@ class Crawler
 		$toSearch = Array.new
 		#TODO: load searched, downloaded, and toSearch from databases if they exist
 		@curURL = url_protocol_smart_add(startURL)
-		#TODO: grab blacklist and whitelist from a database or text file
-		$extBlacklist=['.css','.js', '.ico', '.rss', '.php', '.exe', '.swf', '.html', '.shtm1', '.pdf']
-		$extWhitelist=['.jpg', '.png', '.gif', '.webm']
+
+		$extWhitelist=Array.new
+		if (File.exist?('settings/whitelist.txt'))
+			puts "exists"
+			File.open('settings/whitelist.txt', 'r').each_line do |line|
+				exts = line.split(/\W+/)
+				exts.each{|string| string.insert(0, ".")}
+				$extWhitelist.concat(exts)
+			end
+		end
 		
 		$saveDir = 'downloads/'
 		Dir.mkdir($saveDir) unless Dir.exist?($saveDir)
-		$logDir = 'logs/'
-		Dir.mkdir($logDir) unless Dir.exist?($logDir)
+		
+		$minorErrorTxt = "minorErrors.txt"
+		$majorErrorTxt = "majorErrors.txt"
+		$error = HandleError.new("logs")
 	end
 	
 	def nothingToSearch?
@@ -64,13 +74,8 @@ class Crawler
 		end
 		return true
 	rescue => e
-		#TODO: move code to an error handler
-		File.open($logDir+'main.txt', 'a') do |file|
-			file.puts "---------------------------------------------------------------------------"
-			file.puts curURL
-			file.puts e
-		end  
-		puts "\nEXCEPTION SAVED #{$logDir}main.txt"
+		$error.save_to_file(curURL, e, $majorErrorTxt)
+		puts "\nEXCEPTION SAVED #{$logDir}#{$majorErrorTxt}"
 		return false
 	end
 
@@ -84,7 +89,7 @@ class Crawler
 			if (!url_handled?($downloaded, url))
 				HashOfArray_smart_add($downloaded, url)
 				#if (!$extBlacklist.include?(ext))
-				if ($extWhitelist.include?(ext))
+				if (($extWhitelist.empty?)||($extWhitelist.include?(ext)))
 					url.match(/([^\/]*)\.[a-z]+$/)
 					
 					#get file size
@@ -115,13 +120,8 @@ class Crawler
 		end
 		return true
 	rescue => e
-		#TODO: move code to an error handler
-		File.open($logDir+'down.txt', 'a') do |file|
-			file.puts "---------------------------------------------------------------------------"
-			file.puts url
-			file.puts e
-		end  
-		puts "\nEXCEPTION SAVED #{$logDir}down.txt"
+		$error.save_to_file(curURL, e, $minorErrorTxt)
+		puts "\nEXCEPTION SAVED #{$logDir}#{$minorErrorTxt}"
 		return false
 	end
 

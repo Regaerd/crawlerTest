@@ -1,6 +1,6 @@
 #require 'sdbm'			#provides databases
 require 'io/console'	#provides STDIN.getch
-require './crawler'
+require './lib/crawler'
 
 #for stopping program
 $inputArray = Array.new
