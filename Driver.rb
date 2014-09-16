@@ -37,7 +37,6 @@ mainThread = Thread.new do
 		crawler.autoSearch
 		break if ((crawler.nothingToSearch?)||($killMainThread))
 	end
-	#TODO: store searched and toSearch addresses in databases
 	puts "\nSaving..."
 	crawler.save_to_file
 	puts "Done."
