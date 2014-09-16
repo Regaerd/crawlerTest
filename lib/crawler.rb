@@ -11,7 +11,7 @@ class Crawler
 		$searched = Hash.new
 		$downloaded = Hash.new
 		$toSearch = Array.new
-		#TODO: load searched, downloaded, and toSearch from databases if they exist
+
 		@curURL = url_protocol_smart_add(startURL)
 		
 		@pgCount=0
@@ -118,10 +118,8 @@ class Crawler
 	#search the given url
 	def url_search(curURL)
 		response = get_response_with_redirect(URI.parse(curURL))
-		#check each line
 		if (response.code != "404")
 			response.body.each_line{|line|
-				#get any href
 				results = line.scan(/href="([^"]*)"/)
 				results.each{|href|
 					url = URI.join(curURL, href[0]).to_s
@@ -160,7 +158,6 @@ class Crawler
 					end
 					#$mbTotal = $mbTotal + $file_size
 					print "\rDownloading: #{url} >> #{bytesToMeg($file_size).round(3)}MB                                                                                     "
-					#print "\rDownloading #{@curURL}/#{$1}#{ext} >> #{bytesToMeg($file_size).round(3)}MB                                                                                     "
 					STDOUT.flush
 	
 					#download file
