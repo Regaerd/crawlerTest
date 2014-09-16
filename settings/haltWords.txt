@@ -1,1 +1,1 @@
-exit stop kill x q quit end
+exit stop kill quit end x q
