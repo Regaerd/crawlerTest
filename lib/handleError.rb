@@ -1,6 +1,6 @@
 class HandleError
 	def initialize(dir)
-		$activeDir = dir+"/"
+		$activeDir = dir
 		Dir.mkdir($activeDir) unless Dir.exist?($activeDir)
 	end
 	
