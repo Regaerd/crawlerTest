@@ -1,4 +1,6 @@
 require 'io/console'	#provides STDIN.getch
+require 'thread'
+
 require './lib/crawler'
 
 #Creates a regular expression, using words from a given file and a given option
@@ -27,29 +29,54 @@ print "Starting address: "
 crawler = Crawler.new(gets.chomp)
 haltWords = load_regex_from("settings/haltWords.txt", "i")
 
-$killMainThread = false
-mainThread = Thread.new do
-	puts "Loading..."
-	crawler.load_from_file
+searchT = Thread.new do
 	loop do
-		print "\rSearching: #{crawler.curURL}                                                                                                                           "
-		STDOUT.flush
-		crawler.autoSearch
-		break if ((crawler.nothingToSearch?)||($killMainThread))
+		Thread.stop
+		puts "\nSearching: #{crawler.curURL_Sr}"
+		crawler.auto_search
 	end
-	puts "\nSaving..."
-	crawler.save_to_file
-	puts "Done."
-	puts "Press any key to exit."
-	mainThread.exit
 end
 
-stopThread = Thread.new do
+downloadT = Thread.new do
+	loop do
+		Thread.stop
+		puts "\nDownloading: #{crawler.curURL_Dl}"
+		crawler.auto_download
+	end
+end
+
+count = 0
+$killMainThread = false
+mainT = Thread.new do
+	puts "Loading..."
+	crawler.load_all_from_files
+	puts "Done."
+	loop do
+		if (searchT.stop?)
+			if (downloadT.stop?)
+				crawler.set_next_download
+				downloadT.wakeup
+			end
+			crawler.set_next_search
+			searchT.wakeup
+		end
+		break if ((crawler.nothingToSearch?)||($killMainThread))
+	end
+	system "clear" or system "cls"
+	puts "\nSaving..."
+	crawler.save_all_to_files
+	puts "Done."
+	puts "Press any key to exit."
+
+	mainT.exit
+end
+
+stopT = Thread.new do
 	loop do
 		$inputArray << STDIN.getch
 		if ($killMainThread)&&($inputArray.join =~ /kill/i)
-			mainThread.exit
-			stopThread.exit
+			mainT.exit
+			stopT.exit
 		elsif ($inputArray.join =~ haltWords)
 			$killMainThread = true
 			$inputArray.clear
@@ -60,11 +87,11 @@ stopThread = Thread.new do
 			puts "Total pages to search: #{crawler.pgCount}"
 			puts "----------"
 		end
-		if (!mainThread.alive?)
-			stopThread.exit
+		if (!mainT.alive?)
+			stopT.exit
 		end
 	end
 end
 
-mainThread.join
-stopThread.join
+mainT.join
+stopT.join
